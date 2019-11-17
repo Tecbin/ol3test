@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="ico.jpg">
+    <title>N1</title>
+	
+    <link rel="stylesheet" href="./css/ol.css" type="text/css">
+	<link rel="stylesheet" href="./css/olmy.css" type="text/css">
+    <script src="./js/ol.js"></script>
+	<script src="./js/customer.js"></script>
+	<script src="./js/jquery-3.4.1.min.js"></script>
+    <!-- Bootstrap core CSS -->
+    <link href="./css/bootstrap.min.css" rel="stylesheet">
+    <script language="JavaScript" src="./js/bootstrap.min.js"></script>
+    <!-- Custom styles for this template -->
+    <link href="./css/narrow.css" rel="stylesheet">
+	<link rel="stylesheet" href="./css/measureTool.css" type="text/css">
+    <script type="text/javascript" src="./js/measureTool.js"></script>
+	<script src="./js/windy.js" type="text/javascript"></script>
+
+  </head>
+
+  <body>
+
+    <div class="container">
+      <div class="header clearfix">
+        <nav>
+          <ul class="nav nav-pills pull-right">
+            
+            <li role="presentation" class="active"><a href="about.html">About</a></li>
+            
+          </ul>
+        </nav>
+        <h3 class="text-muted">遥感辅助平台</h3>
+      </div>
+
+<div id="spanll" style="background-color: #999;"><span>当前绘制线的坐标：</span><span id='points' class="label label-default"></span></div>
+     <div>
+        &nbsp;选中的经纬度：
+        <input id="Coordinates" type="text" value="" disabled="disabled" style="width: 350px;" />
+    </div>
+	<div id="mapw" class="mapw">
+      <canvas id="windyMap" class="fill"></canvas>
+      <div id="olMap" class="fill"></div>
+    </div>
+ <div id="map" classtabindex="0" style="width: 100%">
+ 
+ 
+ </div>
+   
+     <div class="btn-group" id="navigate-container">
+        <input type="button" class="btn btn-default" onClick="moveToLeft();" value="左移" />
+        <input type="button" class="btn btn-default" onClick="moveToRight();" value="右移" />
+        <input type="button" class="btn btn-default" onClick="moveToUp();" value="上移" />
+        <input type="button" class="btn btn-default" onClick="moveToDown();" value="下移" />
+        <input type="button" class="btn btn-default" onClick="moveToChengDu();" value="移到中心" />
+        <input type="button" class="btn btn-default" onClick="zoomIn();" value="放大" />
+        <input type="button" class="btn btn-default" onClick="zoomOut();" value="缩小" />
+		<input type="button" class="btn btn-default" onClick="addline();" value="画线" />
+		<input type="button" class="btn btn-default" onClick="swith2sate();" value="卫星图像" />
+		<input type="button" class="btn btn-default" id="wind" onClick="wind();" value="显示实时风场" />
+		<input type="button" class="btn btn-default" onClick="area();" value="面积" />
+		<input type="button" class="btn btn-default" onClick="stop();" value="停止测量" />
+		
+		
+		</div>
+		  <div class="btn-group" id="navigate-container measure">
+
+    </div>
+<script type="text/javascript">
+var lo=104;
+var la=30;
+var zo=3;
+
+
+
+//  https://blog.csdn.net/mhlghy/article/details/71794569 
+    // 创建一个视图
+    var view = new ol.View({
+           center: ol.proj.transform(
+              [lo, la], 'EPSG:4326', 'EPSG:3857'),
+                // 指定投影使用EPSG:4326
+                projection: 'EPSG:3857',
+                
+		
+		/*
+          center: ol.proj.transform(
+              [116, 39], 'EPSG:4326', 'EPSG:3857'), */
+          zoom: zo
+        });
+    var map = new ol.Map({
+	        // 在默认控件的基础上，再加上其他内置的控件
+        controls: ol.control.defaults().extend([
+            new ol.control.FullScreen(),
+            new ol.control.MousePosition(),
+            new ol.control.OverviewMap(),
+            new ol.control.ScaleLine(),
+            new ol.control.ZoomSlider(),
+            new ol.control.ZoomToExtent(),
+			new ol.control.Rotate()
+			]),
+        layers: [
+          new ol.layer.Tile({
+            source: new ol.source.OSM()
+          }),
+		  
+		  
+		  
+        ],
+        target: 'map',
+        view: view,
+		 
+    });
+
+	     //中心点处理
+        function ReturnCenter(centerXY) {
+            var centerObj = centerXY.split(',');
+            var centerX = centerObj[0];
+            var centerY = centerObj[1];
+            return [parseFloat(centerX), parseFloat(centerY)];//一定要转换下类型，否则拖拽后，地图就消失了
+        }
+	//设置中心点覆盖物
+        function SetPosition(map, coordinates) {
+		var m = coordinates.split(",");
+		var coor=ol.proj.transform([m[0],m[1]], 'EPSG:3857', 'EPSG:4326')
+		
+            GetElementId("Coordinates").value = coor;
+
+            var newcenter = ReturnCenter(coordinates);
+            // Position marker
+            var marker = new ol.Overlay({
+                position: newcenter,
+                positioning: 'bottom-center',
+                element: document.getElementById('marker'),
+                stopEvent: false
+            });
+            map.addOverlay(marker);
+        }
+	    function GetElementId(id) {
+            return document.getElementById(id);
+        }
+        function GetElementsByClassName(className) {
+            return document.getElementsByClassName(className);
+        }
+	      //鼠标点击时设置中心点覆盖物
+            GetElementId("map").onclick = function () {
+                coordinates = GetElementsByClassName('ol-mouse-position')[0].innerHTML;
+                SetPosition(map, coordinates);
+            };
+	    // 在viewport节点下添加一个分享按钮
+    var viewport = map.getViewport();
+    $(viewport).append('<div id="share" class="share">分享地图</div>');
+
+
+    // 监听按钮点击事件，执行相关操作
+    document.getElementById('share').onclick =function handleRotateNorth () {
+          view.getMap().getView().setRotation(0);
+        };
+	var openStreetMapLayer = new ol.layer.Tile({
+        source: new ol.source.OSM()
+    });
+		       // 移动到成都
+			  
+        function moveToChengDu() {
+		var view = map.getView();
+            // 设置地图中心为成都的坐标，即可让地图移动
+            view.setCenter(ol.proj.transform([104.06, 30.67], 'EPSG:4326', 'EPSG:3857'));
+			
+            map.render();
+
+        }
+		
+		function addline(){
+		    // 添加一个绘制的线使用的layer
+    var lineLayer = new ol.layer.Vector({
+        source: new ol.source.Vector(),
+        style: new ol.style.Style({
+            stroke: new ol.style.Stroke({
+                color: 'red',
+                size: 1
+            })
+        })
+    })
+    map.addLayer(lineLayer);
+    var lineDraw = new ol.interaction.Draw({
+        type: 'LineString',
+        source: lineLayer.getSource(),    // 注意设置source，这样绘制好的线，就会添加到这个source里
+        style: new ol.style.Style({            // 设置绘制时的样式
+            stroke: new ol.style.Stroke({
+                color: '#009933',
+                size: 1
+            })
+        }),
+        maxPoints: 4    // 限制不超过4个点
+    });
+
+    // 监听线绘制结束事件，获取坐标
+    lineDraw.on('drawend', function(event){
+        // event.feature 就是当前绘制完成的线的Feature
+		var str=JSON.stringify(event.feature.getGeometry().getCoordinates());
+		console.log(str)
+	//	str = str.replace('[', '');
+		var reg = new RegExp('\\[','g');
+		var reg1 = new RegExp('\\]','g');
+		str = str.replace(reg, '');
+		str = str.replace(reg1, '');
+		console.log(str)
+		var m = str.split(",");
+		console.log(m)
+		var coorl=new Array(4);
+		coorl[0]=ol.proj.transform([m[0],m[1]], 'EPSG:3857', 'EPSG:4326');
+		coorl[1]=ol.proj.transform([m[2],m[3]], 'EPSG:3857', 'EPSG:4326');
+		coorl[2]=ol.proj.transform([m[4],m[5]], 'EPSG:3857', 'EPSG:4326');
+		coorl[3]=ol.proj.transform([m[6],m[7]], 'EPSG:3857', 'EPSG:4326');
+        document.getElementById('points').innerHTML = JSON.stringify(coorl);
+		//lineLayer.setVisible();
+    });
+
+
+    map.addInteraction(lineDraw);
+	}
+	
+
+   function swith2sate() {
+      // 先移除当前的地图，再添加Open Street Map 地图
+     map.removeLayer(map.getLayers().item(0));
+      map.addLayer(b);
+  }   
+      var MeasureTool = new ol.control.MeasureTool({
+        sphereradius : 6378137,//sphereradius
+      });
+      map.addControl(MeasureTool);
+	  
+	  
+	  //wind
+const btnwind = document.getElementById('wind');
+btnwind.addEventListener('click',wind);
+function wind(){	
+if(this.value==='显示实时风场'){
+$("#mapw").attr("style","display: block; ")
+
+this.value='隐藏实时风场'}
+else{
+this.value='显示实时风场'
+$("#mapw").attr("style","display: none; ")
+
+}
+}
+  var mapw = new ol.Map({
+  layers: [
+    new ol.layer.Tile({
+      source: new ol.source.Stamen({
+        layer: 'toner'
+      })
+    })
+  ],
+  interactions: ol.interaction.defaults({
+    altShiftDragRotate: false,
+    rotate: false
+  }),
+  target: 'olMap',
+  view: view,
+});
+
+
+var windy;
+
+var canvas = document.getElementById('windyMap');
+function refreshWindy() {
+  if(!windy) {
+    return;
+  }
+  windy.stop();
+  var mapSize = mapw.getSize();
+  var extent = mapw.getView().calculateExtent(mapSize);
+  extent = ol.proj.transformExtent(extent, 'EPSG:3857', 'EPSG:4326');
+
+  canvas.width = mapSize[0];
+  canvas.height = mapSize[1];
+
+  windy.start(
+    [[0,0], [canvas.width, canvas.height]],
+    canvas.width,
+    canvas.height,
+    [[extent[0], extent[1]],[extent[2], extent[3]]]
+  );
+}
+
+fetch('http://esri.github.io/wind-js/gfs.json').then(function(response) {
+  return response.json();
+}).then(function(json) {
+  windy = new Windy({canvas: canvas, data: json });
+  refreshWindy();
+});
+
+mapw.on('moveend', refreshWindy);
+
+</script>
+
+      <div class="row marketing">
+
+      </div>
+
+      <footer class="footer">
+        <p>© 2019 li</p>
+      </footer>
+
+    </div> <!-- /container -->
+
+
